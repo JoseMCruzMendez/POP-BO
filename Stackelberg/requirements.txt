@@ -1,0 +1,9 @@
+dm-tree==0.1.8
+jax==0.4.21
+flax==0.7.4
+jaxopt==0.8.3
+jupyter==1.0.0
+matplotlib==3.8.3
+pandas==2.2.1
+pytest==8.2.1
+scikit-surprise==1.1.4
