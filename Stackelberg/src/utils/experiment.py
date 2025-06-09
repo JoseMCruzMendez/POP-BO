@@ -8,7 +8,6 @@ from src.bandits.EmpiricalMean import EmpiricalMean
 from src.bandits.LGPUCB import LGPUCB
 from src.bandits.GPRegressor import GPRegressor
 from src.bandits.LogisticUCB1 import LogisticUCB1
-from src.bandits.Ecolog import Ecolog
 from src.utils.globals import KERNELS
 from src.utils.kernels import DuellingWrapper
 
@@ -33,14 +32,6 @@ def initialize_estimator(
         estimator_params_update = {
             "failure_level": estimator_config["delta"],
         }
-    elif estimator_config["name"] == "Ecolog":
-        estimator = Ecolog.create(
-            domain=discrete_domain,
-            param_norm_ub=config["utility_function_params"]["param_norm_ub"],
-            arm_norm_ub=config["domain"]["norm_ub"],
-            horizon=estimator_config["num_iter"],
-        )
-        estimator_params_update = {"failure_level": estimator_config["delta"]}
     elif estimator_config["name"] in ["LGPUCB", "GPRegressor"]:
         kernel = KERNELS[estimator_config["kernel"]].from_dict(
             estimator_config["kernel_params"]
@@ -79,6 +70,7 @@ def initialize_estimator(
     else:
         raise ValueError("Estimator not recognized.")
 
+    #print(kernel.kernel.length_scale, kernel.kernel.variance)
     estimator_params = estimator.default_params
     estimator_params = estimator.reset(rng, estimator_params)
     estimator_params = estimator_params.replace(**estimator_params_update)

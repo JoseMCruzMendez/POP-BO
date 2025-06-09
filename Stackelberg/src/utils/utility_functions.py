@@ -11,8 +11,7 @@ from surprise import Reader
 from surprise import SVD
 from surprise.model_selection import GridSearchCV, cross_validate, train_test_split
 
-from src.environments.Domain.DiscreteDomain import DiscreteDomain
-from src.environments.Domain.ContinuousDomain import ContinuousDomain
+from ..environments.Domain.DiscreteDomain import DiscreteDomain
 
 """
 UTILITY FUNCTIONS
@@ -43,7 +42,7 @@ def get_features_for_discrete_domain(arm: jax.Array, domain: DiscreteDomain):
 
 
 def normalize_affine_utility(
-    domain: Union[DiscreteDomain, ContinuousDomain],
+    domain: Union[DiscreteDomain],
     utility_function: Callable,
     utility_params: struct.dataclass,
     output_range: Tuple[float, float] = jnp.nan,
@@ -80,7 +79,7 @@ LINEAR & POLIYNOMIAL UTILITY
 
 
 def create_linear_utility(
-    rng: PRNGKey, domain: Union[DiscreteDomain, ContinuousDomain], function_config: dict
+    rng: PRNGKey, domain: Union[DiscreteDomain], function_config: dict
 ) -> Tuple[struct.dataclass, Callable[[jax.Array, struct.dataclass], jax.Array]]:
     """Creates a linear utility function and its parameters."""
 
@@ -115,7 +114,7 @@ def create_linear_utility(
 
 
 def create_polynomial_utility(
-    rng: PRNGKey, domain: Union[DiscreteDomain, ContinuousDomain], function_config: dict
+    rng: PRNGKey, domain: Union[DiscreteDomain], function_config: dict
 ) -> Tuple[struct.dataclass, Callable[[jax.Array, struct.dataclass], jax.Array]]:
     """Creates a polynomial utility function and its parameters."""
 
@@ -285,7 +284,7 @@ def bukin(arm: jax.Array, params: AffineTransformFunctionParams) -> jax.Array:
 
 def create_standard_optimisation_function(
     rng: PRNGKey,
-    domain: Union[DiscreteDomain, ContinuousDomain],
+    domain: Union[DiscreteDomain],
     function_config: dict,
     utility_function_name: str,
 ) -> Tuple[struct.dataclass, Callable[[jax.Array, struct.dataclass], jax.Array]]:

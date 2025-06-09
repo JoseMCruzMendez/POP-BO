@@ -5,8 +5,8 @@ from flax import struct
 import jax
 from chex import PRNGKey
 import jax.numpy as jnp
-from src.environments.Domain.ContinuousDomain import ContinuousDomain
-from src.environments.Domain.DiscreteDomain import DiscreteDomain
+#from ..src.environments.Domain.ContinuousDomain import ContinuousDomain
+from ..environments.Domain.DiscreteDomain import DiscreteDomain
 
 
 @struct.dataclass
@@ -16,7 +16,7 @@ class EstimatorParams:
 
 @struct.dataclass
 class BaseEstimator:
-    domain: Union[DiscreteDomain, ContinuousDomain]
+    domain: Union[DiscreteDomain]
 
     @classmethod
     def create(cls, *args, **kwargs):

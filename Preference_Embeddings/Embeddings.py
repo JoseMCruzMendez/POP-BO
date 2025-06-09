@@ -88,6 +88,7 @@ class ComplexPreference(nn.Module):
     def __init__(self, in_dim, factor = 2, sizes = None, branches = None):
         super().__init__()
         assert factor % 2 == 0, "factor must be even"
+        self.hparams = {"in_dim": in_dim, "factor": factor, "sizes": sizes, "branches": branches}
         n = in_dim * factor #embeddings dimension must be even
         #self.init_embedding = Embedding(in_dim, n)
         #last size is differentiating layer
@@ -255,13 +256,19 @@ class ReshuffleQuadDataset(Dataset):
         return x, x_prime, label
 
 class FuncDataset(Dataset):
-    def __init__(self, num_pairs, func, minimize = True, in_dim = 2, seed=None):
+    def __init__(self, num_pairs, func, minimize = True, in_dim = 2, seed=None, bounds=None):
         self.num_pairs = num_pairs
         # sample points once; you could re-sample each epoch if you like
         if seed is not None:
             torch.manual_seed(seed)
-        self.X = torch.randn(num_pairs, in_dim)
-        self.Y = torch.randn(num_pairs, in_dim)
+        if bounds is None:
+            bounds = ((0,1), (0,1))
+        self.X = torch.empty(num_pairs, in_dim)
+        self.Y = torch.empty(num_pairs, in_dim)
+        for dim, dim_data in enumerate(bounds):
+            dist = torch.distributions.Uniform(dim_data[0], dim_data[1])
+            self.X[:,dim] = dist.sample((num_pairs,))
+            self.Y[:,dim] = dist.sample((num_pairs,))
         # precompute labels
         self.labels = torch.zeros(num_pairs)
         self.func = func
@@ -275,8 +282,8 @@ class FuncDataset(Dataset):
     def __getitem__(self, idx):
         return self.X[idx], self.Y[idx], self.labels[idx]
 
-def evaluate(model, func, device='cpu'):
-    dataset = FuncDataset(num_pairs=50_000, func = func, minimize=True, in_dim=2)
+def evaluate(model, func, bounds=None, device='cpu'):
+    dataset = FuncDataset(num_pairs=50_000, func = func, minimize=True, in_dim=2, bounds=bounds)
     test_loader  = DataLoader(dataset, batch_size=512, shuffle=True)
     model.eval()
     all_preds = []
@@ -328,9 +335,9 @@ def evaluate(model, func, device='cpu'):
         'confusion_matrix': cm,
     }
 
-def train_on_func(model, func, epochs=10, lr=1e-1, patience=10):
+def train_on_func(model, func, bounds=None, epochs=10, lr=1e-1, patience=10):
     # 5) DataLoader
-    dataset = FuncDataset(num_pairs=50_000, func = func, minimize=True, in_dim=2)
+    dataset = FuncDataset(num_pairs=50_000, func = func, minimize=True, in_dim=2, bounds=bounds)
     loader  = DataLoader(dataset, batch_size=512, shuffle=True)
     total_steps = epochs * len(loader)
     warmup_steps = int(0.1 * total_steps)

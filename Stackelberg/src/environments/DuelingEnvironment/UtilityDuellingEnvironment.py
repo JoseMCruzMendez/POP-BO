@@ -40,7 +40,6 @@ class UtilityDuellingEnv(DuellingEnv):
         arm2 = self.domain.project(arm2)
         utility1 = self.utility_function(arm1, params.utility_function_params)
         utility2 = self.utility_function(arm2, params.utility_function_params)
-        #TODO BT model is here, need to change to embedding setting
         return self.activation_function(utility1 - utility2)
 
     def best_arm(self, params: UtilityDuellingParams) -> Tuple[jnp.ndarray, jnp.ndarray]:

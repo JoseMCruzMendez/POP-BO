@@ -3,7 +3,7 @@ from flax import struct
 from jax import numpy as jnp
 from typing import Callable, Tuple, Union
 
-from src.environments.Domain.BaseDomain import BaseDomain
+from .BaseDomain import BaseDomain
 
 
 @struct.dataclass
@@ -98,6 +98,7 @@ class DiscreteDomain(BaseDomain):
         :param f: The function to maximize. Takes in a feature and returns a scalar value.
         :return: The argmax and max of f over the domain.
         """
+
         values = jax.vmap(f)(self.indices)
         max_idx = jnp.argmax(values)
         max_value = jnp.max(values)

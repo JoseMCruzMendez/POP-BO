@@ -18,7 +18,7 @@ from src.environments.Domain.DiscreteDomain import DiscreteDomain
 from src.environments.Domain import domain_feature_generator
 from src.environments.DuelingEnvironment.UtilityDuellingEnvironment import (
     UtilityDuellingEnv,
-    DuellingEnvParams,
+    UtilityDuellingParams,
 )
 
 from src.bandits.EmpiricalMean import EmpiricalMean
@@ -68,7 +68,7 @@ ACQUISITION_FUNCTIONS = {
 
 def initialize_environment(
     rng: PRNGKey, config: dict, env_data: Optional[dict] = None
-) -> Tuple[DiscreteDomain, UtilityDuellingEnv, DuellingEnvParams]:
+) -> Tuple[DiscreteDomain, UtilityDuellingEnv, UtilityDuellingParams]:
     # Setup domain and environment
     if config["utility_function"] != "yelp":
         rng, _rng = jax.random.split(rng)

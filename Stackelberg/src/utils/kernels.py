@@ -45,11 +45,14 @@ class RBFKernel(Kernel):
             * jnp.sum((x2d[:, None, :] - y2d[None, :, :]) ** 2, axis=-1)
             / self.length_scale**2
         )
+        #jax.debug.print("covar min: {x}, covar max: {y}", x=covar.min(), y=covar.max())
         # Remove added dimensions
         if x.ndim == 1 and y.ndim == 1:
-            return covar.squeeze()
+            #return covar.squeeze()
+            return covar.reshape(1,1)
         elif x.ndim == 1 or y.ndim == 1:
-            return covar.reshape(-1)
+            #TODO this was changed from covar.reshape(-1), in case anything else breaks it probably starts here
+            return covar.reshape(-1, 1)
         else:
             return covar
 

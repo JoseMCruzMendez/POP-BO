@@ -1,0 +1,31 @@
+{
+  "hparams": {
+    "in_dim": 2,
+    "factor": 2,
+    "sizes": [
+      512,
+      256,
+      128,
+      64,
+      32
+    ],
+    "branches": 1
+  },
+  "eval_metrics": {
+    "accuracy": 0.5002,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "roc_auc": 0.49970011980807666,
+    "confusion_matrix": [
+      [
+        5002,
+        2
+      ],
+      [
+        4996,
+        0
+      ]
+    ]
+  }
+}
