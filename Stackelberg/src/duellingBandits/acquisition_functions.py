@@ -32,7 +32,7 @@ def max_min_lcb(
         lcb = jnp.where(
             candidate_arms_mask[:, None] * candidate_arms_mask[None, :],
             lcb,
-            jnp.nan,
+            jnp.inf,
         )
         lcb = jnp.where(jnp.eye(lcb.shape[0]), jnp.nan, lcb)
     else:
@@ -53,7 +53,7 @@ def max_min_lcb(
         argmax_set = jnp.where(
             jnp.abs(min_j - maxmin_lcb) < argmax_tol,
             jax.random.choice(key, n, shape=(n,), replace=False),
-            jnp.nan,
+            -jnp.inf,
         )
         next_arm_i = jnp.nanargmax(argmax_set)
         next_arm_j = argmin_j[next_arm_i]

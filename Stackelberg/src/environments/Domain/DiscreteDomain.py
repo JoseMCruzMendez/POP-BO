@@ -48,7 +48,7 @@ class DiscreteDomain(BaseDomain):
                     f"Features shape's first entry {features.shape} does not match num_elements {num_elements}."
                 )
             features = jnp.concatenate(
-                [features, jnp.full((1, features.shape[1]), jnp.nan)], axis=0
+                [features, jnp.full((1, features.shape[1]), jnp.inf)], axis=0
             )
         return cls(
             num_elements=num_elements,

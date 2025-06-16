@@ -70,8 +70,8 @@ class LogisticUCB1(BaseEstimator):
             design_matrix_inv=(1 / dim) * jnp.eye(dim),
             theta_hat=jax.random.normal(rng, (dim,)),
             ctr=0,
-            arms=jnp.full(self.horizon, jnp.nan),
-            rewards=jnp.full(self.horizon, jnp.nan),
+            arms=jnp.full(self.horizon, jnp.inf),
+            rewards=jnp.full(self.horizon, jnp.inf),
         )
         ucb_bonus = self._get_ucb_bonus(params)
         params = params.replace(ucb_bonus=ucb_bonus)

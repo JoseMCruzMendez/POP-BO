@@ -245,10 +245,10 @@ def make_experiment_runner(
                 lambda x: (
                     x[-1],
                     {
-                        "alpha": jnp.full_like(estimator_params.alpha, jnp.nan)
+                        "alpha": jnp.full_like(estimator_params.alpha, jnp.inf)
                         if acquisition_function_name != "Sparring"
-                        else jnp.full_like(estimator_params[0].alpha, jnp.nan),
-                        "nll": jnp.nan,
+                        else jnp.full_like(estimator_params[0].alpha, jnp.inf),
+                        "nll": jnp.inf,
                     }
                     if config["estimator"]["name"] == "LGPUCB"
                     else {},

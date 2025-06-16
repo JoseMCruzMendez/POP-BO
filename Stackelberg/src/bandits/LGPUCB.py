@@ -18,7 +18,7 @@ class LGPUCBParams:
     # Hyperparameters
     kernel: Kernel = None
     lambda_: float = None
-    beta: float = jnp.nan
+    beta: float = jnp.inf
     delta: float = None
     nll_regularization_penalty: float = 0.0
     # Variables
@@ -73,12 +73,12 @@ class LGPUCB(BaseEstimator):
 
     def reset(self, rng: PRNGKey, params: LGPUCBParams):
         params = params.replace(
-            alpha=jnp.full(self.horizon, jnp.nan),
-            gram_matrix=jnp.full((self.horizon, self.horizon), jnp.nan),
-            # gram_matrix_L=jnp.full((self.horizon, self.horizon), jnp.nan),
+            alpha=jnp.full(self.horizon, jnp.inf),
+            gram_matrix=jnp.full((self.horizon, self.horizon), jnp.inf),
+            # gram_matrix_L=jnp.full((self.horizon, self.horizon), jnp.inf),
             ctr=0,
-            arms=jnp.full((self.horizon, 2), jnp.nan) if self.duelling else jnp.full(self.horizon, jnp.nan),
-            rewards=jnp.full(self.horizon, jnp.nan),
+            arms=jnp.full((self.horizon, 2), jnp.inf) if self.duelling else jnp.full(self.horizon, jnp.inf),
+            rewards=jnp.full(self.horizon, jnp.inf),
         )
         return params
 
@@ -143,7 +143,7 @@ class LGPUCB(BaseEstimator):
         )  # Normalize
         results = solver.run(init_alpha)
         alpha = jnp.where(
-            mask_in_horizon, results.params, jnp.nan
+            mask_in_horizon, results.params, jnp.inf
         )  # Replace unused values with NaNs
 
         # Update the parameters
@@ -203,7 +203,7 @@ class LGPUCB(BaseEstimator):
             self._update_alpha,
             lambda key, x: (
                 x,
-                {"nll": jnp.nan, "alpha": jnp.full_like(x.rewards, jnp.nan)},
+                {"nll": jnp.inf, "alpha": jnp.full_like(x.rewards, jnp.inf)},
             ),  # Do nothing
             key,
             params,
@@ -349,7 +349,7 @@ class LGPUCB(BaseEstimator):
                     key, jnp.arange(n, dtype=jnp.float32), shape=(n,), replace=False
                 ),
                 0.5 * jnp.ones(n, dtype=jnp.float32),
-                jnp.nan * jnp.ones(n, dtype=jnp.float32),
+                -jnp.inf * jnp.ones(n, dtype=jnp.float32),
             ),
             get_best_arm_set,
         )

@@ -42,9 +42,8 @@ class GPODuellingEnv(UtilityDuellingEnv):
         #For some reason, the base library wraps their utility function in a get_feature call, added here as their wrapper assumes single-input functions
         arm1 = self.domain.get_feature(arm1)
         arm2 = self.domain.get_feature(arm2)
-        error_if_nan(arm1)
-        error_if_nan(arm2)
-        score = self.pref_function(arm1, arm2)
+        #TODO set to negative to see if it fixes preferences
+        score = -self.pref_function(arm1, arm2)
         score = jax.lax.clamp(score, -3., 3.)
 
         return self.activation_function(score)
