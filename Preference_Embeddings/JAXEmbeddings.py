@@ -96,22 +96,14 @@ class ComplexPreference(nn.Module):
 # -----------------------------------------------------------------------------
 # 2) FuncDataset (simple NumPy/JAX version + batching)
 # -----------------------------------------------------------------------------
-def generate_func_data(
+def get_ranges_and_evals(
         num_pairs: int,
         func: Callable[[np.ndarray], np.ndarray],
         in_dim: int = 2,
         bounds: Optional[Sequence[Tuple[float, float]]] = None,
-        seed: Optional[int] = None
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Generate `num_pairs` random input pairs (X[i], Y[i]) in [bounds]^in_dim
-    and compute binary labels “1 if func(X) < func(Y) (minimization), else 0.”
-
-    Returns:
-      X: np.ndarray of shape [num_pairs, in_dim]
-      Y: np.ndarray of shape [num_pairs, in_dim]
-      labels: np.ndarray of shape [num_pairs] in {0,1}
-    """
+        seed: Optional[int] = None,
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Builds and returns the ranges and evaluations of `func` over `num_pairs` random pairs."""
     if bounds is None:
         # default to [0,1]^in_dim
         bounds = [(0.0, 1.0)] * in_dim
@@ -126,7 +118,29 @@ def generate_func_data(
     fX = func(X)  # shape: [num_pairs]
     fY = func(Y)
 
-    # label = 1 if fX < fY (i.e., X is “better” than Y in minimization)
+    return X, Y, fX, fY
+
+def generate_func_data(
+        num_pairs: int,
+        func: Callable[[np.ndarray], np.ndarray],
+        in_dim: int = 2,
+        bounds: Optional[Sequence[Tuple[float, float]]] = None,
+        seed: Optional[int] = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Generate `num_pairs` random input pairs (X[i], Y[i]) in [bounds]^in_dim
+    and compute binary labels “1 if func(X) < func(Y) (minimization), else 0.”
+
+    Returns:
+      X: np.ndarray of shape [num_pairs, in_dim]
+      Y: np.ndarray of shape [num_pairs, in_dim]
+      labels: np.ndarray of shape [num_pairs] in {0,1}
+    """
+    if bounds is None:
+        # default to [0,1]^in_dim
+        bounds = [(0.0, 1.0)] * in_dim
+
+    X, Y, fX, fY = get_ranges_and_evals(num_pairs, func, in_dim, bounds, seed)
     labels = (fX < fY).astype(np.int32)
     return X, Y, labels
 
@@ -156,6 +170,33 @@ def data_batch_generator(
         lbl_b = labels[batch_idxs]
         yield jnp.array(x_b, dtype=jnp.float32), jnp.array(xp_b, dtype=jnp.float32), jnp.array(lbl_b, dtype=jnp.float32)
 
+def unlabeled_batch_generator(
+        X: np.ndarray,
+        Y: np.ndarray,
+        batch_size: int = 256,
+        shuffle: bool = True,
+        seed: Optional[int] = None
+):
+    """
+    Yields minibatches of (x_batch, x_prime_batch, label_batch) as JAX arrays.
+    """
+    num_pairs = X.shape[0]
+    Xidxs = np.arange(num_pairs)
+    Yidxs = np.arange(num_pairs)
+    if shuffle:
+        rng = np.random.RandomState(seed)
+        rng.shuffle(Xidxs)
+        rng.shuffle(Yidxs)
+
+    for start in range(0, num_pairs, batch_size):
+        end = start + batch_size
+        Xbatch_idxs = Xidxs[start:end]
+        Ybatch_idxs = Yidxs[start:end]
+        x_b   = X[Xbatch_idxs]
+        xp_b  = Y[Ybatch_idxs]
+        lbl_b = x_b >= xp_b
+        yield jnp.array(x_b, dtype=jnp.float32), jnp.array(xp_b, dtype=jnp.float32), jnp.array(lbl_b, dtype=jnp.float32)
+
 # -----------------------------------------------------------------------------
 # 3) train_on_func (JAX training loop with Optax)
 # -----------------------------------------------------------------------------
@@ -180,7 +221,7 @@ def train_on_func(
       - 'train_losses': list of per‐epoch final loss
     """
     # 1) Generate the entire dataset once (NumPy)
-    X_all, Y_all, L_all = generate_func_data(
+    X_all, Y_all, fX_all, fY_all = get_ranges_and_evals(
         num_pairs=num_pairs,
         func=func,
         in_dim=in_dim,
@@ -205,7 +246,7 @@ def train_on_func(
     )
 
     # 4) Create optimizer (Adam) with that schedule
-    optimizer = optax.adam(learning_rate=lr_schedule)
+    optimizer = optax.adamw(learning_rate=lr_schedule)
     opt_state = optimizer.init(params)
 
     # 5) Define one training‐step (JIT‐compiled)
@@ -231,8 +272,8 @@ def train_on_func(
     for epoch in range(1, epochs + 1):
         # Shuffle + batch generator for this epoch
         epoch_seed = int(jax.random.randint(rng_key, (), 0, 1e6))
-        batch_gen = data_batch_generator(
-            X_all, Y_all, L_all, batch_size, shuffle=True, seed=epoch_seed
+        batch_gen = unlabeled_batch_generator(
+            fX_all, fY_all, batch_size, shuffle=True, seed=epoch_seed
         )
 
         epoch_loss_accum = 0.0
@@ -290,7 +331,7 @@ def evaluate(
         func=func,
         in_dim=in_dim,
         bounds=bounds,
-        seed=42
+        seed=42,
     )
 
     all_preds = []
