@@ -141,7 +141,7 @@ def generate_func_data(
         bounds = [(0.0, 1.0)] * in_dim
 
     X, Y, fX, fY = get_ranges_and_evals(num_pairs, func, in_dim, bounds, seed)
-    labels = (fX < fY).astype(np.int32)
+    labels = (fX >= fY).astype(np.int32)
     return X, Y, labels
 
 
@@ -173,6 +173,8 @@ def data_batch_generator(
 def unlabeled_batch_generator(
         X: np.ndarray,
         Y: np.ndarray,
+        fX: np.ndarray,
+        fY: np.ndarray,
         batch_size: int = 256,
         shuffle: bool = True,
         seed: Optional[int] = None
@@ -194,7 +196,9 @@ def unlabeled_batch_generator(
         Ybatch_idxs = Yidxs[start:end]
         x_b   = X[Xbatch_idxs]
         xp_b  = Y[Ybatch_idxs]
-        lbl_b = x_b >= xp_b
+        fx_b  = fX[Xbatch_idxs]
+        fxp_b = fY[Ybatch_idxs]
+        lbl_b = fx_b >= fxp_b
         yield jnp.array(x_b, dtype=jnp.float32), jnp.array(xp_b, dtype=jnp.float32), jnp.array(lbl_b, dtype=jnp.float32)
 
 # -----------------------------------------------------------------------------
@@ -206,8 +210,6 @@ def train_on_func(
         func: Callable[[np.ndarray], np.ndarray],
         bounds: Optional[Sequence[Tuple[float, float]]] = None,
         in_dim: int = 2,
-        factor: int = 2,
-        sizes: Optional[Sequence[int]] = None,
         num_pairs: int = 50_000,
         batch_size: int = 512,
         epochs: int = 10,
@@ -273,7 +275,7 @@ def train_on_func(
         # Shuffle + batch generator for this epoch
         epoch_seed = int(jax.random.randint(rng_key, (), 0, 1e6))
         batch_gen = unlabeled_batch_generator(
-            fX_all, fY_all, batch_size, shuffle=True, seed=epoch_seed
+            X_all, Y_all, fX_all, fY_all, batch_size, shuffle=True, seed=epoch_seed
         )
 
         epoch_loss_accum = 0.0
