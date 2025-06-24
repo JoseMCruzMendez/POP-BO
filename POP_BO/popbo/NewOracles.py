@@ -9,13 +9,20 @@ import flax.serialization as serialization
 import json
 import jax
 from typing import Callable
+from pathlib import Path
+import os.path as path
+import os
 
 #Model loading logic
 def get_model(name: str) -> Callable:
     # -----------------------------------------------------------------------------
     # 2.2) Read hyperparameters from JSON
     # -----------------------------------------------------------------------------
-    hparam_path = f"../Embedding_Model_Weights/{name}.json"
+    base_path = '/Users/josecruz/Desktop/S25 Files/MIE Lab/Code/'
+    hparam_path = path.join(
+        base_path,
+        f"Embedding_Model_Weights/{name}.json"
+    )
     with open(hparam_path, "r") as f:
         metadata = json.load(f)
     hparams = metadata["hparams"]
@@ -40,7 +47,7 @@ def get_model(name: str) -> Callable:
     # -----------------------------------------------------------------------------
     # 2.4) Read the saved parameter bytes and re‐hydrate them
     # -----------------------------------------------------------------------------
-    param_path = f"../Embedding_Model_Weights/{name}.msgpack"
+    param_path = path.join(base_path, f"Embedding_Model_Weights/{name}.msgpack")
     with open(param_path, "rb") as f:
         loaded_bytes = f.read()
 
@@ -54,6 +61,7 @@ def det_oracle(fx, fx_prime):
 def model_oracle(model):
     def oracle(fx, fx_prime):
         score = model(fx, fx_prime)
+        score = np.clip(score, -6, 6) #prevents overflow in sigmoid
         p = sigmoid(score)
         xwin = Bernoulli_sample(p)
         return xwin

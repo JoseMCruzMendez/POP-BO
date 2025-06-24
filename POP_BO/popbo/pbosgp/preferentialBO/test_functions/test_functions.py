@@ -1488,10 +1488,8 @@ class Schwefel(test_func):
 class Matyas(test_func):
     def __init__(self):
         self.noise_var = 0
-        self.d = 3
-        self.bounds = (
-                np.array([-10, 10]), np.array([-10,10])
-        )
+        self.d = 2
+        self.bounds = np.array([[-10, -10], [10, 10]])
         # self.bounds = np.array([[-32.768, -32.768, -32.768, -32.768], [32.768, 32.768, 32.768, 32.768]])
         self.M = 1
         self.standard_length_scale = standard_length_scale(self.bounds)

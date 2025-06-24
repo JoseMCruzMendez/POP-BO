@@ -246,7 +246,8 @@ def get_config(problem_name, problem_dim=None, GP_kernel=None, discret_num=3,
             'Bukin': 3,
             'Eggholder': 0.5,
             'Langerman': 1.0,
-            'Shubert': 0.5
+            'Shubert': 0.5,
+            'Matyas': 0.5,
         }
         test_func_name = problem_name[10:]
         test_func_std = 1.0 # test_func_name_to_std[test_func_name]
@@ -271,7 +272,8 @@ def get_config(problem_name, problem_dim=None, GP_kernel=None, discret_num=3,
             'Styblinski_tang_': 5,
             'Bukin': 4,
             'Langerman': 3,
-            'Eggholder': 3
+            'Eggholder': 3,
+            'Matyas': 8,
         }
         if test_func_name in test_func_name_to_norm_bound.keys():
             config['norm_bound'] = test_func_name_to_norm_bound[test_func_name]

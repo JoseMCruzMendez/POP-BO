@@ -214,7 +214,8 @@ def train_on_func(
         batch_size: int = 512,
         epochs: int = 10,
         lr: float = 1e-1,
-        patience: int = 10
+        patience: int = 10,
+        ackley=True
 ) -> dict:
     """
     Trains `model_def` (an uninitialized Flax module) on randomly generated pairs
@@ -230,9 +231,19 @@ def train_on_func(
         bounds=bounds,
         seed=0
     )
-
+    #Normalizes inputs to [-1,1] prevent swish saturation. Furthermore, generates "Fourier features" by sending to sin/cos space
+    # if ackley:
+    #     def fourier_encode(x, B):
+    #         # x shape: (..., d);  B shape: (d, m)
+    #         x_proj = 2.0 * jnp.pi * (x @ B)          # (..., m)
+    #         return jnp.concatenate([jnp.sin(x_proj), jnp.cos(x_proj)], axis=-1)
+    #     X_all /= 32
+    #     Y_all /= 32
+    #     B = jax.random.normal(rng_key, (in_dim, 256)) * 10.
+    #     X_all = fourier_encode(X_all, B)
+    #     Y_all = fourier_encode(Y_all, B)
     # 2) Initialize model parameters
-    init_batch = jnp.zeros((batch_size, in_dim), dtype=jnp.float32)
+    init_batch = jnp.zeros((1, in_dim), dtype=jnp.float32)
     variables = model_def.init(rng_key, init_batch, init_batch)  # e.g. {'params': {...}}
     params = variables['params']
 
