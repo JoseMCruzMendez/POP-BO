@@ -38,6 +38,8 @@ from src.duellingBandits.acquisition_functions import (
     doubleTS
 )
 
+from ModelHelpers import get_model
+from src.environments.DuelingEnvironment.GPODuellingEnvironment import GPODuellingEnv
 
 ESTIMATORS = {
     "EmpiricalMean": EmpiricalMean,
@@ -67,7 +69,7 @@ ACQUISITION_FUNCTIONS = {
 
 
 def initialize_environment(
-    rng: PRNGKey, config: dict, env_data: Optional[dict] = None
+    rng: PRNGKey, config: dict, env_data: Optional[dict] = None, gpo: bool = False,
 ) -> Tuple[DiscreteDomain, UtilityDuellingEnv, DuellingEnvParams]:
     # Setup domain and environment
     if config["utility_function"] != "yelp":
@@ -111,11 +113,19 @@ def initialize_environment(
     else:
         raise ValueError("Invalid param_initialization. Use 'normal' or 'yelp'.")
 
-    env = UtilityDuellingEnv(
-        domain=domain,
-        utility_function=utility_function,
-        # use_domain_features=(config["utility_function"] != "yelp"),
-    )
+    if not gpo:
+        env = UtilityDuellingEnv(
+            domain=domain,
+            utility_function=utility_function,
+            # use_domain_features=(config["utility_function"] != "yelp"),
+        )
+    else:
+        model = get_model(name=config["utility_function"])
+        env = GPODuellingEnv(
+            domain=domain,
+            pref_function=model,
+            utility_function=utility_function,
+        )
     env_params = env.default_params.replace(
         utility_function_params=utility_params,
     )
@@ -134,6 +144,7 @@ def make_experiment_runner(
     acquisition_function: Callable = None,
     acquisition_function_idx: int = None,
     return_env_and_estimator: bool = False,
+    gpo: bool = False,
 ):
     assert acquisition_function is not None or acquisition_function_idx is not None
 
@@ -145,7 +156,7 @@ def make_experiment_runner(
         # Initialize environment
         rng, _rng = jax.random.split(rng)
         discrete_domain, env, env_params = initialize_environment(
-            rng, config, env_data=env_data
+            rng, config, env_data=env_data, gpo=gpo
         )
 
         # Initialize estimator
@@ -297,135 +308,142 @@ def make_experiment_runner(
 
 if __name__ == "__main__":
     # Parse command line arguments
-    func = "ackley"
-    argsdir = "data/preference_feedback/"+func
-    argsalgo = "max_min_lcb_no_candidates"
-    print("Output directory: ", argsdir)
-    print("Device used: ", jax.devices())
+    #gpo = True
+    #func = "branin"
+    for gpo in [False]:
+        for func in ["branin", "hoelder", "matyas", "michalewicz", "rosenbrock"]:
+            if func in ["branin"]:
+                continue
+            argsdir = "data/preference_feedback/"+func
+            argsalgo = "max_min_lcb_no_candidates"
+            gpo_ending = "" if not gpo else "_gpo"
+            print("Output directory: ", argsdir)
+            print("Device used: ", jax.devices())
 
-    # Load configuration
-    config_path = os.path.join(argsdir, "config.yaml")
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    print("Configuration: ", config)
+            # Load configuration
+            config_path = os.path.join(argsdir, "config.yaml")
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f)
+            print("Configuration: ", config)
 
-    acquisition_function_list = config["acquisition_functions"] if argsalgo is None else [argsalgo]
-    print("Acquisition functions: ", acquisition_function_list)
+            acquisition_function_list = config["acquisition_functions"] if argsalgo is None else [argsalgo]
+           # print("Acquisition functions: ", acquisition_function_list)
 
-    rng = jax.random.PRNGKey(config["seed"])
+            rng = jax.random.PRNGKey(config["seed"])
 
-    # If using Yelp data, load it
-    if config["utility_function"] == "yelp":
-        print("Loading Yelp data")
-        config_utility_params = config["utility_function_params"]
-        env_data = load_yelp_data(
-            data_dir="data/yelp_aggregates",
-            city=config_utility_params["city"],
-            min_review_count=config_utility_params["min_review_count"],
-            min_review_per_user=config_utility_params["min_review_per_user"],
-            collaborative_filtering_args=config_utility_params[
-                "collaborative_filtering_args"
-            ],
-        )
-        print("Data loaded. Shapes:")
-        for key, data in env_data.items():
-            print(key, data.shape)
-    else:
-        env_data = None
-
-    for acquisition_function_name in acquisition_function_list:
-        try:
-            acquisition_function = ACQUISITION_FUNCTIONS[acquisition_function_name]
-        except KeyError:
-            raise ValueError(
-                f"Invalid acquisition function name: {acquisition_function_name}"
-            )
-        print(
-            f"Running experiment for acquisition function: {acquisition_function_name}"
-        )
-        start_time = time.time()
-        run_experiment = make_experiment_runner(
-            config=config,
-            acquisition_function_name=acquisition_function_name,
-            acquisition_function=acquisition_function,
-        )
-
-        # Get estimator params to update in a grid search
-        config_estimator = config["estimator"].copy()
-        config_estimator_update = {
-            name: jnp.array(value)
-            for name, value in config_estimator.items()
-            if isinstance(value, list)
-        }
-        if any(
-            [
-                isinstance(value, list)
-                for value in config_estimator["kernel_params"].values()
-            ]
-        ):
-            config_estimator_update["kernel_params"] = {
-                name: jnp.array(value)
-                for name, value in config_estimator["kernel_params"].items()
-                if isinstance(value, list)
-            }
-        flat_tree, tree_structure = jax.tree_util.tree_flatten(config_estimator_update)
-        grid_search_mesh = jax.tree.map(lambda x: x.ravel(), jnp.meshgrid(*flat_tree))
-        grid_search_params = jax.tree_util.tree_unflatten(
-            tree_structure, grid_search_mesh
-        )
-        # print("Grid search params: ", grid_search_params)
-
-        if len(grid_search_params) > 0:
-            print("Grid search params: ", grid_search_params)
-            run_experiment_vmap = jax.jit(
-                jax.vmap(
-                    jax.vmap(
-                        run_experiment,
-                        in_axes=(None, None, 0),
-                    ),
-                    in_axes=(0, None, None),
+            # If using Yelp data, load it
+            if config["utility_function"] == "yelp":
+                print("Loading Yelp data")
+                config_utility_params = config["utility_function_params"]
+                env_data = load_yelp_data(
+                    data_dir="data/yelp_aggregates",
+                    city=config_utility_params["city"],
+                    min_review_count=config_utility_params["min_review_count"],
+                    min_review_per_user=config_utility_params["min_review_per_user"],
+                    collaborative_filtering_args=config_utility_params[
+                        "collaborative_filtering_args"
+                    ],
                 )
-            )
-            output, metrics = jax.block_until_ready(
-                run_experiment_vmap(
-                    jax.random.split(rng, config["num_seeds"]),
-                    env_data,
-                    grid_search_params,
+                print("Data loaded. Shapes:")
+                for key, data in env_data.items():
+                    print(key, data.shape)
+            else:
+                env_data = None
+
+            for acquisition_function_name in acquisition_function_list:
+                try:
+                    acquisition_function = ACQUISITION_FUNCTIONS[acquisition_function_name]
+                except KeyError:
+                    raise ValueError(
+                        f"Invalid acquisition function name: {acquisition_function_name}"
+                    )
+                print(
+                    f"Running experiment for function: {func}"
                 )
-            )
-        else:
-            run_experiment_vmap = jax.vmap(run_experiment, in_axes=(0, None, None))
-            output, metrics = jax.block_until_ready(
-                run_experiment_vmap(
-                    jax.random.split(rng, config["num_seeds"]),
-                    env_data,
-                    None,
+                start_time = time.time()
+                run_experiment = make_experiment_runner(
+                    config=config,
+                    acquisition_function_name=acquisition_function_name,
+                    acquisition_function=acquisition_function,
+                    gpo=gpo,
                 )
-            )
-        print(
-            "Running time: {:.2f}m {:.2f}s".format(
-                *divmod(time.time() - start_time, 60)
-            )
-        )
 
-        # Save the results
-        output_file = os.path.join(argsdir, acquisition_function_name + ".pkl")
-        with open(output_file, "wb") as f:
-            pickle.dump(metrics, f)
+                # Get estimator params to update in a grid search
+                config_estimator = config["estimator"].copy()
+                config_estimator_update = {
+                    name: jnp.array(value)
+                    for name, value in config_estimator.items()
+                    if isinstance(value, list)
+                }
+                if any(
+                    [
+                        isinstance(value, list)
+                        for value in config_estimator["kernel_params"].values()
+                    ]
+                ):
+                    config_estimator_update["kernel_params"] = {
+                        name: jnp.array(value)
+                        for name, value in config_estimator["kernel_params"].items()
+                        if isinstance(value, list)
+                    }
+                flat_tree, tree_structure = jax.tree_util.tree_flatten(config_estimator_update)
+                grid_search_mesh = jax.tree.map(lambda x: x.ravel(), jnp.meshgrid(*flat_tree))
+                grid_search_params = jax.tree_util.tree_unflatten(
+                    tree_structure, grid_search_mesh
+                )
+                # print("Grid search params: ", grid_search_params)
 
-        # Save the estimator params
-        output_file = os.path.join(
-            argsdir, acquisition_function_name + "_estimator_params.pkl"
-        )
-        with open(output_file, "wb") as f:
-            pickle.dump(output["estimator"], f)
+                if len(grid_search_params) > 0:
+                    print("Grid search params: ", grid_search_params)
+                    run_experiment_vmap = jax.jit(
+                        jax.vmap(
+                            jax.vmap(
+                                run_experiment,
+                                in_axes=(None, None, 0),
+                            ),
+                            in_axes=(0, None, None),
+                        )
+                    )
+                    output, metrics = jax.block_until_ready(
+                        run_experiment_vmap(
+                            jax.random.split(rng, config["num_seeds"]),
+                            env_data,
+                            grid_search_params,
+                        )
+                    )
+                else:
+                    run_experiment_vmap = jax.vmap(run_experiment, in_axes=(0, None, None))
+                    output, metrics = jax.block_until_ready(
+                        run_experiment_vmap(
+                            jax.random.split(rng, config["num_seeds"]),
+                            env_data,
+                            None,
+                        )
+                    )
+                print(
+                    "Running time: {:.2f}m {:.2f}s".format(
+                        *divmod(time.time() - start_time, 60)
+                    )
+                )
 
-        if len(grid_search_params) > 0:
-            # Save grid_search_params
-            output_file = os.path.join(
-                argsdir, acquisition_function_name + "_grid_search_params.pkl"
-            )
-            with open(output_file, "wb") as f:
-                pickle.dump(grid_search_params, f)
+                # Save the results
+                output_file = os.path.join(argsdir, acquisition_function_name + gpo_ending + ".pkl")
+                with open(output_file, "wb") as f:
+                    pickle.dump(metrics, f)
 
-        del output, metrics, grid_search_params
+                # Save the estimator params
+                output_file = os.path.join(
+                    argsdir, acquisition_function_name + f"{gpo_ending}_estimator_params.pkl"
+                )
+                with open(output_file, "wb") as f:
+                    pickle.dump(output["estimator"], f)
+
+                if len(grid_search_params) > 0:
+                    # Save grid_search_params
+                    output_file = os.path.join(
+                        argsdir, acquisition_function_name + f"_grid_search_params{gpo_ending}.pkl"
+                    )
+                    with open(output_file, "wb") as f:
+                        pickle.dump(grid_search_params, f)
+
+                del output, metrics, grid_search_params
